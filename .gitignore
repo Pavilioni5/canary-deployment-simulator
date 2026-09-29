@@ -216,3 +216,24 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project Specific
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+ENV/
+env/
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# Database & testing artifacts
+*.sqlite3
+*.db
+locust_report.html
+.pytest_cache/

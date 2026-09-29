@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # PostgreSQL Database Service
+  # ----------------------------------------------------------------------------
+  db:
+    image: postgres:15-alpine
+    container_name: canary_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: canary_user
+      POSTGRES_PASSWORD: canary_password
+      POSTGRES_DB: canary_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canary_user -d canary_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # Backend API Service (FastAPI)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: canary_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://canary_user:canary_password@db:5432/canary_db
+      SECRET_KEY: canary-deployment-simulator-academic-secret-key-p71-2026
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # Frontend Dashboard Service (React + Vite)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: canary_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

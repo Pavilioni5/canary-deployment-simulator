@@ -1,10 +1,23 @@
 """
 Main FastAPI entry point for Canary Deployment Simulator (P71).
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routes.health import router as health_router
+from app.routes.auth import router as auth_router
+from app.database import init_db
+from app.utils.init_db import seed_admin_user
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize DB schema and seed default admin on application startup
+    init_db()
+    seed_admin_user()
+    yield
+
 
 tags_metadata = [
     {
@@ -42,7 +55,8 @@ This REST API provides an interactive platform to simulate, control, and monitor
     version="1.0.0",
     openapi_tags=tags_metadata,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Configure CORS Middleware
@@ -56,3 +70,4 @@ app.add_middleware(
 
 # Register Routers
 app.include_router(health_router)
+app.include_router(auth_router)

@@ -1,10 +1,35 @@
 """
-Database Initialization Utility Script.
+Database Initialization & Admin Seeding Utility Script.
 Run via: python -m app.utils.init_db
 """
 import sys
-from app.database import init_db, check_db_tables, engine
+from app.database import init_db, check_db_tables, SessionLocal
 from app.config import settings
+from app.models.user import User
+from app.auth.security import hash_password
+
+
+def seed_admin_user():
+    """Seed default administrator user if not present."""
+    db = SessionLocal()
+    try:
+        admin_email = settings.DEFAULT_ADMIN_EMAIL.lower().strip()
+        existing = db.query(User).filter(User.email == admin_email).first()
+        if not existing:
+            admin = User(
+                email=admin_email,
+                hashed_password=hash_password(settings.DEFAULT_ADMIN_PASSWORD),
+                full_name=settings.DEFAULT_ADMIN_NAME,
+                role="ADMIN",
+                is_active=True
+            )
+            db.add(admin)
+            db.commit()
+            print(f"[+] Default Admin seeded: {admin_email} (Role: ADMIN)")
+        else:
+            print(f"[*] Admin user already exists: {admin_email}")
+    finally:
+        db.close()
 
 
 def main():
@@ -28,6 +53,9 @@ def main():
             sys.exit(1)
         else:
             print(f"[+] All {len(expected_tables)} required academic schema tables are verified!")
+
+        # Seed initial admin user
+        seed_admin_user()
     except Exception as e:
         print(f"[-] Database initialization error: {e}")
         sys.exit(1)

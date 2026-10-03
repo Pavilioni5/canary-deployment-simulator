@@ -17,32 +17,11 @@ When running locally:
 - **Summary**: System Information Root
 - **Description**: Returns project metadata, project ID (P71), active version, status, and environment.
 - **Status Code**: `200 OK`
-- **Response Example**:
-```json
-{
-  "project": "Cloud-Based Canary Deployment Simulator",
-  "project_id": "P71",
-  "version": "1.0.0",
-  "status": "operational",
-  "environment": "development",
-  "docs_url": "/docs",
-  "timestamp": "2026-10-03T05:40:00.000000Z"
-}
-```
 
 ### `GET /health`
 - **Summary**: Basic Liveness Probe
 - **Description**: Standard health check endpoint for AWS ALB target groups, Docker health checks, and Kubernetes liveness probes.
 - **Status Code**: `200 OK`
-- **Response Example**:
-```json
-{
-  "status": "healthy",
-  "environment": "development",
-  "timestamp": "2026-10-03T05:40:00.000000Z",
-  "uptime_seconds": 45.12
-}
-```
 
 ### `GET /health/details`
 - **Summary**: Detailed Component Diagnostics
@@ -79,72 +58,10 @@ Authorization: Bearer <access_token>
 
 ## 3. Deployment Management Endpoints (Implemented - Phase 5)
 
-All deployment management endpoints require authentication (`Authorization: Bearer <token>`).
-
 ### `POST /deployments`
 - **Summary**: Create Canary Deployment
 - **Description**: Creates a deployment record with baseline Stable (v1) and candidate Canary (v2) versions, and sets initial traffic to `100% Stable / 0% Canary`.
 - **Status Code**: `201 Created`
-- **Request Body**:
-```json
-{
-  "name": "Payment Gateway Microservice",
-  "description": "Canary rollout of optimized checkout engine v2",
-  "rollback_threshold": 10.0,
-  "evaluation_window_seconds": 60,
-  "stable_tag": "v1.0.0",
-  "canary_tag": "v2.0.0",
-  "stable_latency_ms": 45.0,
-  "canary_latency_ms": 48.0,
-  "initial_canary_failure_rate": 0.0
-}
-```
-- **Response Example**:
-```json
-{
-  "id": 1,
-  "name": "Payment Gateway Microservice",
-  "description": "Canary rollout of optimized checkout engine v2",
-  "status": "PENDING",
-  "rollback_threshold": 10.0,
-  "evaluation_window_seconds": 60,
-  "user_id": 1,
-  "created_at": "2026-10-03T12:00:00.000000Z",
-  "updated_at": "2026-10-03T12:00:00.000000Z",
-  "versions": [
-    {
-      "id": 1,
-      "deployment_id": 1,
-      "version_tag": "v1.0.0",
-      "version_type": "STABLE",
-      "image_tag": "payment-gateway-microservice:v1.0.0",
-      "simulated_latency_ms": 45.0,
-      "failure_rate": 0.0,
-      "is_active": true,
-      "created_at": "2026-10-03T12:00:00.000000Z"
-    },
-    {
-      "id": 2,
-      "deployment_id": 1,
-      "version_tag": "v2.0.0",
-      "version_type": "CANARY",
-      "image_tag": "payment-gateway-microservice:v2.0.0",
-      "simulated_latency_ms": 48.0,
-      "failure_rate": 0.0,
-      "is_active": true,
-      "created_at": "2026-10-03T12:00:00.000000Z"
-    }
-  ],
-  "traffic_config": {
-    "id": 1,
-    "deployment_id": 1,
-    "stable_percentage": 100.0,
-    "canary_percentage": 0.0,
-    "last_shifted_at": "2026-10-03T12:00:00.000000Z",
-    "updated_at": "2026-10-03T12:00:00.000000Z"
-  }
-}
-```
 
 ### `GET /deployments`
 - **Summary**: List Deployments
@@ -160,13 +77,6 @@ All deployment management endpoints require authentication (`Authorization: Bear
 - **Summary**: Update Deployment Settings
 - **Description**: Modifies mutable parameters such as `rollback_threshold`, `name`, or `description`.
 - **Status Code**: `200 OK`
-- **Request Body**:
-```json
-{
-  "rollback_threshold": 12.5,
-  "description": "Adjusted threshold for load test"
-}
-```
 
 ### `DELETE /deployments/{id}`
 - **Summary**: Delete Deployment
@@ -180,15 +90,90 @@ All deployment management endpoints require authentication (`Authorization: Bear
 
 ---
 
-## 4. Planned Endpoints for Subsequent Phases
+## 4. Stable v1 & Canary v2 Simulation Endpoints (Implemented - Phase 6)
 
-### Canary Traffic Control & Simulation (Phases 6, 7, 9, 10)
+### `POST /deployments/{id}/simulate/version/{version_type}`
+- **Summary**: Simulate Requests Directly to Target Version
+- **Description**: Executes N simulated requests directly against either the `STABLE` or `CANARY` instance. Measures latency with realistic jitter (+/- 10%) and emulates synthetic HTTP 500 error packets according to the configured `failure_rate`.
+- **Path Parameters**:
+  - `id`: Deployment ID
+  - `version_type`: `STABLE` or `CANARY`
+- **Status Code**: `200 OK`
+- **Request Body**:
+```json
+{
+  "count": 5,
+  "payload": {
+    "action": "process_checkout",
+    "amount": 49.99
+  }
+}
+```
+- **Response Example**:
+```json
+{
+  "deployment_id": 1,
+  "deployment_name": "Payment Gateway Microservice",
+  "version_type": "CANARY",
+  "version_tag": "v2.0.0",
+  "total_requests": 5,
+  "successful_requests": 4,
+  "failed_requests": 1,
+  "error_rate": 20.0,
+  "avg_latency_ms": 48.34,
+  "results": [
+    {
+      "request_id": "req-9c8e104e76a1",
+      "version_type": "CANARY",
+      "version_tag": "v2.0.0",
+      "status": "SUCCESS",
+      "status_code": 200,
+      "latency_ms": 47.12,
+      "error_message": null,
+      "headers": {
+        "X-Request-Id": "req-9c8e104e76a1",
+        "X-Amzn-Trace-Id": "Root=1-670001a2-abc1234567890def",
+        "X-App-Version": "v2.0.0",
+        "X-Target-Group": "tg-canary",
+        "X-Simulated-Latency": "47.12ms"
+      },
+      "timestamp": "2026-10-03T17:35:00.000000Z"
+    }
+  ]
+}
+```
+
+### `GET /deployments/{id}/versions`
+- **Summary**: Get Deployment Versions
+- **Description**: Lists both version instances (`STABLE` and `CANARY`) with their latency, failure rate, and image tags.
+- **Status Code**: `200 OK`
+
+### `PUT /deployments/{id}/versions/{version_type}`
+- **Summary**: Configure Version Simulation Parameters
+- **Description**: Dynamically updates version runtime parameters such as simulated latency (ms), synthetic failure rate (`0.0` to `1.0`), and active status.
+- **Status Code**: `200 OK`
+- **Request Body**:
+```json
+{
+  "simulated_latency_ms": 65.0,
+  "failure_rate": 0.25,
+  "is_active": true
+}
+```
+
+---
+
+## 5. Planned Endpoints for Subsequent Phases
+
+### Weighted Traffic Splitting & Dynamic Routing (Phase 7)
 - `POST /deployments/{id}/traffic` - Adjust stable vs canary traffic distribution (e.g., 90/10, 75/25, 50/50, 0/100)
 - `POST /deployments/{id}/simulate` - Dispatch simulated requests across traffic split
-- `POST /deployments/{id}/failure` - Inject synthetic failure rate into canary version (v2)
-- `POST /deployments/{id}/rollback` - Manually trigger rollback to 100% stable
 
 ### Observability, Logs & Metrics (Phase 8)
 - `GET /deployments/{id}/metrics` - Query real-time metrics (success, error rate, latency)
 - `GET /deployments/{id}/logs` - Inspect structured application logs
 - `GET /deployments/{id}/history` - View chronological state transitions and rollback events
+
+### Automated Circuit Breaker & Failure Injection (Phases 9 & 10)
+- `POST /deployments/{id}/failure` - Inject synthetic failure rate into canary version (v2)
+- `POST /deployments/{id}/rollback` - Manually trigger rollback to 100% stable

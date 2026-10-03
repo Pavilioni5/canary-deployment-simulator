@@ -8,6 +8,7 @@ from app.config import settings
 from app.routes.health import router as health_router
 from app.routes.auth import router as auth_router
 from app.routes.deployments import router as deployments_router
+from app.routes.simulation import router as simulation_router
 from app.database import init_db
 from app.utils.init_db import seed_admin_user
 
@@ -32,6 +33,10 @@ tags_metadata = [
     {
         "name": "Deployments",
         "description": "Canary deployment lifecycle: creation, traffic shifting, failure injection, and rollbacks.",
+    },
+    {
+        "name": "Simulation & Versions",
+        "description": "Stable v1 and Canary v2 execution emulation, synthetic error injection, and latency simulation.",
     },
     {
         "name": "Metrics & Logs",
@@ -73,3 +78,4 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(deployments_router)
+app.include_router(simulation_router)

@@ -48,33 +48,6 @@ When running locally:
 - **Summary**: Detailed Component Diagnostics
 - **Description**: Provides sub-system breakdown (FastAPI async engine, Database connectivity parameters, Traffic router engine).
 - **Status Code**: `200 OK`
-- **Response Example**:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2026-10-03T05:40:00.000000Z",
-  "uptime_seconds": 45.12,
-  "components": {
-    "api": {
-      "status": "healthy",
-      "message": "FastAPI asynchronous engine is responsive",
-      "details": null
-    },
-    "database_configured": {
-      "status": "configured",
-      "message": "Database URL configured",
-      "details": {
-        "driver": "sqlite"
-      }
-    },
-    "traffic_router": {
-      "status": "ready",
-      "message": "Traffic shifting sub-engine ready for deployment registrations",
-      "details": null
-    }
-  }
-}
-```
 
 ---
 
@@ -87,93 +60,127 @@ Authorization: Bearer <access_token>
 
 ### `POST /auth/register`
 - **Summary**: Register New User Account
-- **Description**: Creates a new user with bcrypt password hashing and assigns an RBAC role (`USER` or `ADMIN`).
+- **Status Code**: `201 Created`
+
+### `POST /auth/login`
+- **Summary**: User Login & JWT Generation
+- **Status Code**: `200 OK`
+
+### `GET /auth/me`
+- **Summary**: Current Authenticated User Profile
+- **Security**: Requires Bearer JWT
+- **Status Code**: `200 OK`
+
+### `GET /auth/admin-only`
+- **Summary**: RBAC Protected Demo Route (ADMIN only)
+- **Status Code**: `200 OK` (Admin) / `403 Forbidden` (User)
+
+---
+
+## 3. Deployment Management Endpoints (Implemented - Phase 5)
+
+All deployment management endpoints require authentication (`Authorization: Bearer <token>`).
+
+### `POST /deployments`
+- **Summary**: Create Canary Deployment
+- **Description**: Creates a deployment record with baseline Stable (v1) and candidate Canary (v2) versions, and sets initial traffic to `100% Stable / 0% Canary`.
 - **Status Code**: `201 Created`
 - **Request Body**:
 ```json
 {
-  "email": "engineer@canary.local",
-  "password": "SecurePassword123!",
-  "full_name": "DevOps Engineer",
-  "role": "USER"
+  "name": "Payment Gateway Microservice",
+  "description": "Canary rollout of optimized checkout engine v2",
+  "rollback_threshold": 10.0,
+  "evaluation_window_seconds": 60,
+  "stable_tag": "v1.0.0",
+  "canary_tag": "v2.0.0",
+  "stable_latency_ms": 45.0,
+  "canary_latency_ms": 48.0,
+  "initial_canary_failure_rate": 0.0
 }
 ```
 - **Response Example**:
 ```json
 {
   "id": 1,
-  "email": "engineer@canary.local",
-  "full_name": "DevOps Engineer",
-  "role": "USER",
-  "is_active": true,
-  "created_at": "2026-10-03T05:41:00.000000Z"
+  "name": "Payment Gateway Microservice",
+  "description": "Canary rollout of optimized checkout engine v2",
+  "status": "PENDING",
+  "rollback_threshold": 10.0,
+  "evaluation_window_seconds": 60,
+  "user_id": 1,
+  "created_at": "2026-10-03T12:00:00.000000Z",
+  "updated_at": "2026-10-03T12:00:00.000000Z",
+  "versions": [
+    {
+      "id": 1,
+      "deployment_id": 1,
+      "version_tag": "v1.0.0",
+      "version_type": "STABLE",
+      "image_tag": "payment-gateway-microservice:v1.0.0",
+      "simulated_latency_ms": 45.0,
+      "failure_rate": 0.0,
+      "is_active": true,
+      "created_at": "2026-10-03T12:00:00.000000Z"
+    },
+    {
+      "id": 2,
+      "deployment_id": 1,
+      "version_tag": "v2.0.0",
+      "version_type": "CANARY",
+      "image_tag": "payment-gateway-microservice:v2.0.0",
+      "simulated_latency_ms": 48.0,
+      "failure_rate": 0.0,
+      "is_active": true,
+      "created_at": "2026-10-03T12:00:00.000000Z"
+    }
+  ],
+  "traffic_config": {
+    "id": 1,
+    "deployment_id": 1,
+    "stable_percentage": 100.0,
+    "canary_percentage": 0.0,
+    "last_shifted_at": "2026-10-03T12:00:00.000000Z",
+    "updated_at": "2026-10-03T12:00:00.000000Z"
+  }
 }
 ```
 
-### `POST /auth/login`
-- **Summary**: User Login & JWT Generation
-- **Description**: Validates email and salted bcrypt hash, returning a signed JWT access token.
+### `GET /deployments`
+- **Summary**: List Deployments
+- **Description**: Returns all deployments belonging to the authenticated user (or all deployments if user is an administrator).
+- **Status Code**: `200 OK`
+
+### `GET /deployments/{id}`
+- **Summary**: Get Deployment Details
+- **Description**: Retrieves full deployment state including child version entities and traffic configuration.
+- **Status Code**: `200 OK`
+
+### `PUT /deployments/{id}`
+- **Summary**: Update Deployment Settings
+- **Description**: Modifies mutable parameters such as `rollback_threshold`, `name`, or `description`.
 - **Status Code**: `200 OK`
 - **Request Body**:
 ```json
 {
-  "email": "engineer@canary.local",
-  "password": "SecurePassword123!"
-}
-```
-- **Response Example**:
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer",
-  "expires_in_minutes": 60,
-  "user_id": 1,
-  "email": "engineer@canary.local",
-  "role": "USER",
-  "full_name": "DevOps Engineer"
+  "rollback_threshold": 12.5,
+  "description": "Adjusted threshold for load test"
 }
 ```
 
-### `GET /auth/me`
-- **Summary**: Current Authenticated User Profile
-- **Description**: Returns profile and role claims of the currently authenticated user.
-- **Security**: Requires Bearer JWT
+### `DELETE /deployments/{id}`
+- **Summary**: Delete Deployment
+- **Description**: Permanently deletes a deployment with cascading deletion of all associated versions, traffic configs, metrics, and logs.
+- **Status Code**: `204 No Content`
+
+### `POST /deployments/{id}/start`
+- **Summary**: Start Canary Rollout
+- **Description**: Activates deployment by transitioning status from `PENDING` to `RUNNING`.
 - **Status Code**: `200 OK`
-- **Response Example**:
-```json
-{
-  "id": 1,
-  "email": "engineer@canary.local",
-  "full_name": "DevOps Engineer",
-  "role": "USER",
-  "is_active": true,
-  "created_at": "2026-10-03T05:41:00.000000Z"
-}
-```
-
-### `GET /auth/admin-only`
-- **Summary**: RBAC Protected Demo Route
-- **Description**: Demonstrates Role-Based Access Control. Returns `200 OK` for users with `ADMIN` role; returns `403 Forbidden` for standard `USER` accounts.
-- **Security**: Requires Bearer JWT with `role == "ADMIN"`
-- **Status Code**: `200 OK` or `403 Forbidden`
-- **Response Example (Admin)**:
-```json
-{
-  "message": "Access granted to admin-only area.",
-  "admin_email": "admin@canary.local",
-  "role": "ADMIN"
-}
-```
 
 ---
 
-## 3. Planned Endpoints for Subsequent Phases
-
-### Deployment Management (Phase 5)
-- `POST /deployments` - Create a new deployment with stable (v1) and canary (v2) configs
-- `GET /deployments` - List all deployments
-- `GET /deployments/{id}` - Retrieve details of a specific deployment
-- `POST /deployments/{id}/start` - Launch canary traffic shifting
+## 4. Planned Endpoints for Subsequent Phases
 
 ### Canary Traffic Control & Simulation (Phases 6, 7, 9, 10)
 - `POST /deployments/{id}/traffic` - Adjust stable vs canary traffic distribution (e.g., 90/10, 75/25, 50/50, 0/100)

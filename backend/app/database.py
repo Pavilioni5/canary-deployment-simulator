@@ -1,7 +1,8 @@
 """
 Database session and engine setup for SQLAlchemy.
+Supports PostgreSQL (RDS/Docker) and SQLite fallback.
 """
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.config import settings
 
@@ -26,3 +27,15 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def init_db():
+    """Create all database tables registered with Base."""
+    import app.models  # Ensure all models are registered with Base.metadata # noqa
+    Base.metadata.create_all(bind=engine)
+
+
+def check_db_tables():
+    """Inspect and return existing table names."""
+    inspector = inspect(engine)
+    return inspector.get_table_names()

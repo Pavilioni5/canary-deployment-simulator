@@ -46,6 +46,7 @@ class DeploymentVersion(Base):
     image_tag = Column(String(100), default="latest", nullable=False)
     simulated_latency_ms = Column(Float, default=50.0, nullable=False)
     failure_rate = Column(Float, default=0.0, nullable=False)  # Range 0.0 to 1.0 (e.g. 0.3 = 30% errors)
+    error_type = Column(String(50), default="HTTP_500", nullable=True)  # HTTP_500, LATENCY_TIMEOUT, DATABASE_ERROR, MEMORY_SPIKE
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 

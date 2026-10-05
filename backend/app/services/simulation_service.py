@@ -49,14 +49,34 @@ def execute_single_version_request(
     is_failed = random.random() < version.failure_rate
 
     if is_failed:
+        error_type = (getattr(version, "error_type", None) or "HTTP_500").upper().strip()
+        status_code = 500
+        error_msg = f"Simulated HTTP 500: Internal server fault injected in {version.version_tag} ({version.version_type})"
+
+        if error_type in ["LATENCY_TIMEOUT", "TIMEOUT"]:
+            status_code = 504
+            latency_ms = max(latency_ms, 2500.0)
+            error_msg = f"Simulated HTTP 504: Gateway timeout injected in {version.version_tag} ({version.version_type})"
+        elif error_type in ["DATABASE_ERROR", "DB_CONNECTION_DROP"]:
+            status_code = 500
+            error_msg = f"Simulated DatabaseConnectionError: Connection pool exhausted in {version.version_tag} ({version.version_type})"
+        elif error_type in ["MEMORY_SPIKE", "OUT_OF_MEMORY", "MEMORY_PRESSURE"]:
+            status_code = 503
+            error_msg = f"Simulated HTTP 503: Service Unavailable due to memory pressure in {version.version_tag} ({version.version_type})"
+        elif error_type not in ["HTTP_500", "INTERNAL_SERVER_ERROR"]:
+            error_msg = f"Simulated Fault ({error_type}): Error injected in {version.version_tag} ({version.version_type})"
+
+        headers["X-Fault-Injected"] = error_type
+        headers["X-Simulated-Latency"] = f"{latency_ms}ms"
+
         return SimulatedRequestResult(
             request_id=req_id,
             version_type=version.version_type,
             version_tag=version.version_tag,
             status="FAILED",
-            status_code=500,
+            status_code=status_code,
             latency_ms=latency_ms,
-            error_message=f"Simulated HTTP 500: Internal server fault injected in {version.version_tag} ({version.version_type})",
+            error_message=error_msg,
             headers=headers,
             timestamp=utc_now()
         )

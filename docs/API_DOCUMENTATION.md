@@ -183,7 +183,68 @@ During client traffic simulation (`POST /deployments/{id}/simulate`):
 
 ---
 
-## 8. Planned Endpoints for Subsequent Phases
+## 8. Controlled Failure Injection Endpoints (Implemented - Phase 10)
 
-### Controlled Failure Injection (Phase 10)
-- `POST /deployments/{id}/failure` - Dedicated endpoint to configure artificial failure scenarios for live viva demonstration
+### `POST /deployments/{id}/failure`
+- **Summary**: Inject Controlled Failure
+- **Description**: Configures synthetic failure rates, fault profiles, and latency overrides on a target version (default: `CANARY`). Generates an audit trail record with `event_type="FAILURE_INJECTED"` and logs to `logs` under source `CHAOS_ENGINE`.
+- **Security**: Requires Bearer JWT
+- **Status Code**: `200 OK`
+- **Request Body**:
+```json
+{
+  "failure_rate": 0.35,
+  "error_type": "HTTP_500",
+  "affected_version": "CANARY",
+  "latency_ms": 45.0
+}
+```
+*Note: `failure_rate` accepts either probability fractions (`0.35`) or percentage values (`35.0`). Supported `error_type` values include `HTTP_500`, `LATENCY_TIMEOUT`, `DATABASE_ERROR`, and `MEMORY_SPIKE`.*
+
+- **Response Example**:
+```json
+{
+  "deployment_id": 1,
+  "deployment_name": "Checkout Microservice",
+  "affected_version": "CANARY",
+  "version_tag": "v2.0.0",
+  "failure_rate": 0.35,
+  "failure_percentage": 35.0,
+  "error_type": "HTTP_500",
+  "simulated_latency_ms": 45.0,
+  "status": "FAILURE_INJECTED",
+  "message": "Controlled failure injected into v2.0.0 (CANARY): failure_rate=35.0%, error_type='HTTP_500'.",
+  "timestamp": "2026-10-05T13:30:00Z"
+}
+```
+
+### `DELETE /deployments/{id}/failure`
+- **Summary**: Clear Failure Injection
+- **Description**: Resets synthetic failure rate on the Canary version to `0.0%`, clearing active fault injection profiles and logging status `CLEARED`.
+- **Security**: Requires Bearer JWT
+- **Status Code**: `200 OK`
+- **Response Example**:
+```json
+{
+  "deployment_id": 1,
+  "deployment_name": "Checkout Microservice",
+  "affected_version": "CANARY",
+  "version_tag": "v2.0.0",
+  "failure_rate": 0.0,
+  "failure_percentage": 0.0,
+  "error_type": "HTTP_500",
+  "simulated_latency_ms": 50.0,
+  "status": "CLEARED",
+  "message": "Failure injection cleared for v2.0.0 (CANARY): failure_rate reset to 0.0%.",
+  "timestamp": "2026-10-05T13:32:00Z"
+}
+```
+
+---
+
+## 9. Planned Next Phases
+
+### Frontend Dashboard (Phase 11)
+- React + Vite responsive control dashboard
+- Pure Vanilla CSS design system (dark mode, glassmorphism, no Tailwind)
+- Live traffic weight sliders, chaos injection controls, and real-time metrics telemetry

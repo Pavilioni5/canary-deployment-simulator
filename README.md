@@ -190,7 +190,7 @@ docker compose up --build
 
 ## Automated Testing
 
-The backend includes a comprehensive Pytest test suite covering health probes, database models, JWT authentication, RBAC authorization, deployment CRUD, and simulation execution.
+The backend includes a comprehensive Pytest test suite with 52 automated tests covering health probes, database models, JWT authentication, RBAC authorization, deployment CRUD, version simulation, weighted traffic distribution, real-time metrics telemetry, automated/manual circuit breaker rollbacks, and controlled failure injection.
 
 To execute the test suite:
 ```bash
@@ -198,6 +198,7 @@ cd backend
 .\venv\Scripts\activate
 pytest -v
 ```
+
 
 ---
 

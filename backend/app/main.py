@@ -12,6 +12,7 @@ from app.routes.simulation import router as simulation_router
 from app.routes.traffic import router as traffic_router
 from app.routes.metrics import router as metrics_router
 from app.routes.rollback import router as rollback_router
+from app.routes.failure import router as failure_router
 from app.database import init_db
 from app.utils.init_db import seed_admin_user
 
@@ -48,6 +49,10 @@ tags_metadata = [
     {
         "name": "Rollback & Circuit Breaker",
         "description": "Automated and manual rollback circuit breakers restoring 100% stable traffic upon error breach.",
+    },
+    {
+        "name": "Controlled Failure Injection",
+        "description": "Chaos engineering and controlled fault injection to evaluate canary resilience and trigger automated rollbacks.",
     },
     {
         "name": "Metrics & Observability",
@@ -91,5 +96,6 @@ app.include_router(auth_router)
 app.include_router(deployments_router)
 app.include_router(simulation_router)
 app.include_router(traffic_router)
+app.include_router(failure_router)
 app.include_router(rollback_router)
 app.include_router(metrics_router)

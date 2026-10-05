@@ -24,6 +24,7 @@ class DeploymentVersionResponse(BaseModel):
     image_tag: str
     simulated_latency_ms: float
     failure_rate: float
+    error_type: Optional[str] = "HTTP_500"
     is_active: bool
     created_at: datetime
 

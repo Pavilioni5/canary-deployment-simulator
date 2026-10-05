@@ -219,6 +219,10 @@ def simulate_routed_traffic(
         avg_latency_ms=round(sum(all_latencies) / count, 2) if count > 0 else 0.0
     )
 
+    # Persist metrics snapshots to database
+    from app.services.metrics_service import record_simulation_metrics
+    record_simulation_metrics(db, deployment.id, stable_summary, canary_summary, overall_summary)
+
     # Diagnostic execution log
     log_entry = DeploymentLog(
         deployment_id=deployment.id,

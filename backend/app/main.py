@@ -10,6 +10,7 @@ from app.routes.auth import router as auth_router
 from app.routes.deployments import router as deployments_router
 from app.routes.simulation import router as simulation_router
 from app.routes.traffic import router as traffic_router
+from app.routes.metrics import router as metrics_router
 from app.database import init_db
 from app.utils.init_db import seed_admin_user
 
@@ -44,8 +45,8 @@ tags_metadata = [
         "description": "Weighted traffic shifting algorithm mimicking AWS ALB target group weight distribution.",
     },
     {
-        "name": "Metrics & Logs",
-        "description": "Real-time metrics, error rate calculations, and structured deployment event logs.",
+        "name": "Metrics & Observability",
+        "description": "Real-time metrics aggregation, structured application logs, and deployment audit trail.",
     },
 ]
 
@@ -85,3 +86,4 @@ app.include_router(auth_router)
 app.include_router(deployments_router)
 app.include_router(simulation_router)
 app.include_router(traffic_router)
+app.include_router(metrics_router)

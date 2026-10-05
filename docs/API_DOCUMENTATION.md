@@ -106,117 +106,121 @@ Authorization: Bearer <access_token>
 
 ### `POST /deployments/{id}/traffic`
 - **Summary**: Shift Canary Traffic Percentage
-- **Description**: Dynamically configures traffic routing weights between Stable v1 and Canary v2 (e.g. 90/10, 75/25, 50/50, 0/100). Emulates AWS Application Load Balancer weighted target groups, updates the database, and records an audit log.
+- **Description**: Dynamically configures traffic routing weights between Stable v1 and Canary v2 (e.g. 90/10, 75/25, 50/50, 0/100).
 - **Status Code**: `200 OK`
-- **Request Body**:
-```json
-{
-  "canary_percentage": 25.0,
-  "stable_percentage": 75.0
-}
-```
-*(Note: `stable_percentage` is optional; if omitted, the system computes `100.0 - canary_percentage`).*
-- **Response Example**:
-```json
-{
-  "deployment_id": 1,
-  "stable_percentage": 75.0,
-  "canary_percentage": 25.0,
-  "last_shifted_at": "2026-10-04T17:35:00.000000Z",
-  "message": "Traffic weights successfully updated to 75.0% Stable / 25.0% Canary."
-}
-```
 
 ### `GET /deployments/{id}/traffic`
 - **Summary**: Get Current Traffic Split Configuration
 - **Status Code**: `200 OK`
-- **Response Example**:
-```json
-{
-  "id": 1,
-  "deployment_id": 1,
-  "stable_percentage": 75.0,
-  "canary_percentage": 25.0,
-  "last_shifted_at": "2026-10-04T17:35:00.000000Z",
-  "updated_at": "2026-10-04T17:35:00.000000Z"
-}
-```
 
 ### `POST /deployments/{id}/simulate`
 - **Summary**: Simulate Client Traffic Across Weighted Router
-- **Description**: Dispatches N client requests through the weighted traffic router. Requests are routed probabilistically to Stable v1 or Canary v2 according to active weights. Returns a detailed telemetry breakdown for both versions and the overall deployment.
+- **Description**: Dispatches N client requests through the weighted traffic router and persists metric snapshots.
 - **Status Code**: `200 OK`
-- **Request Body**:
-```json
-{
-  "count": 50,
-  "payload": {
-    "route": "/checkout",
-    "user_id": 1042
-  }
-}
-```
+
+---
+
+## 6. Metrics & Observability Endpoints (Implemented - Phase 8)
+
+All observability endpoints require authentication (`Authorization: Bearer <token>`).
+
+### `GET /deployments/{id}/metrics`
+- **Summary**: Get Aggregated Deployment Metrics
+- **Description**: Returns real-time metrics computed across historical simulations: total requests, stable requests, canary requests, overall/canary/stable error rates, average latency, rollback counts, and time-series snapshots for chart rendering.
+- **Status Code**: `200 OK`
 - **Response Example**:
 ```json
 {
   "deployment_id": 1,
-  "deployment_name": "Order Checkout Service",
+  "deployment_name": "Checkout Microservice",
   "status": "RUNNING",
-  "traffic_weights": {
-    "stable": 75.0,
-    "canary": 25.0
-  },
-  "total_requests": 50,
-  "stable_summary": {
-    "total_requests": 38,
-    "successful_requests": 38,
-    "failed_requests": 0,
-    "error_rate": 0.0,
-    "avg_latency_ms": 42.15
-  },
-  "canary_summary": {
-    "total_requests": 12,
-    "successful_requests": 12,
-    "failed_requests": 0,
-    "error_rate": 0.0,
-    "avg_latency_ms": 46.80
-  },
-  "overall_summary": {
-    "total_requests": 50,
-    "successful_requests": 50,
-    "failed_requests": 0,
-    "error_rate": 0.0,
-    "avg_latency_ms": 43.27
-  },
-  "results": [
+  "rollback_threshold": 10.0,
+  "total_requests": 150,
+  "stable_requests": 112,
+  "canary_requests": 38,
+  "total_successful": 147,
+  "total_failed": 3,
+  "overall_error_rate": 2.0,
+  "stable_error_rate": 0.0,
+  "canary_error_rate": 7.89,
+  "average_response_time_ms": 28.45,
+  "rollback_count": 0,
+  "recent_snapshots": [
     {
-      "request_id": "req-3fa85f64e9a1",
-      "version_type": "CANARY",
-      "version_tag": "v2.0.0",
-      "status": "SUCCESS",
-      "status_code": 200,
-      "latency_ms": 45.3,
-      "error_message": null,
-      "headers": {
-        "X-Canary-Routing": "canary",
-        "X-Configured-Canary-Weight": "25.0%",
-        "X-Configured-Stable-Weight": "75.0%",
-        "X-App-Version": "v2.0.0"
-      },
-      "timestamp": "2026-10-04T17:35:10.000000Z"
+      "id": 1,
+      "deployment_id": 1,
+      "version_type": "TOTAL",
+      "total_requests": 50,
+      "successful_requests": 49,
+      "failed_requests": 1,
+      "error_rate": 2.0,
+      "avg_response_time_ms": 28.1,
+      "timestamp": "2026-10-05T09:40:00.000000Z"
     }
   ]
 }
 ```
 
+### `GET /deployments/{id}/logs`
+- **Summary**: Get Deployment Application Logs
+- **Description**: Inspects structured diagnostic logs. Supports optional filtering by `level` (INFO, WARNING, ERROR, CRITICAL) and `source` (ROUTER, SIMULATOR, MONITOR, SYSTEM, AUTH), with pagination.
+- **Query Parameters**:
+  - `level`: e.g. `ERROR`
+  - `source`: e.g. `ROUTER`
+  - `skip`: default `0`
+  - `limit`: default `50`
+- **Status Code**: `200 OK`
+- **Response Example**:
+```json
+[
+  {
+    "id": 10,
+    "deployment_id": 1,
+    "level": "INFO",
+    "source": "ROUTER",
+    "message": "Traffic simulation: 50 requests dispatched across split (Stable: 38, Canary: 12). Overall error rate: 0.0%.",
+    "timestamp": "2026-10-05T09:40:05.000000Z"
+  }
+]
+```
+
+### `GET /deployments/{id}/history`
+- **Summary**: Get Deployment Audit History
+- **Description**: Returns chronological audit trail of state transitions (`CREATED`, `STARTED`, `TRAFFIC_SHIFT`, `FAILURE_INJECTED`, `AUTO_ROLLBACK`, `MANUAL_ROLLBACK`).
+- **Status Code**: `200 OK`
+- **Response Example**:
+```json
+[
+  {
+    "id": 3,
+    "deployment_id": 1,
+    "event_type": "TRAFFIC_SHIFT",
+    "message": "Traffic shifted: Stable 75.0% / Canary 25.0%.",
+    "details": "{\"stable\": 75.0, \"canary\": 25.0}",
+    "timestamp": "2026-10-05T09:35:00.000000Z"
+  },
+  {
+    "id": 2,
+    "deployment_id": 1,
+    "event_type": "STARTED",
+    "message": "Canary rollout lifecycle activated. State transitioned to RUNNING.",
+    "details": "{\"status\": \"RUNNING\"}",
+    "timestamp": "2026-10-05T09:30:15.000000Z"
+  },
+  {
+    "id": 1,
+    "deployment_id": 1,
+    "event_type": "CREATED",
+    "message": "Deployment created with Stable (v1.0.0) and Canary (v2.0.0).",
+    "details": "{\"threshold\": 10.0, \"stable\": \"v1.0.0\", \"canary\": \"v2.0.0\"}",
+    "timestamp": "2026-10-05T09:30:00.000000Z"
+  }
+]
+```
+
 ---
 
-## 6. Planned Endpoints for Subsequent Phases
-
-### Observability, Logs & Metrics (Phase 8)
-- `GET /deployments/{id}/metrics` - Query real-time metrics (success, error rate, latency)
-- `GET /deployments/{id}/logs` - Inspect structured application logs
-- `GET /deployments/{id}/history` - View chronological state transitions and rollback events
+## 7. Planned Endpoints for Subsequent Phases
 
 ### Automated Circuit Breaker & Controlled Failure Injection (Phases 9 & 10)
 - `POST /deployments/{id}/failure` - Inject synthetic failure rate into canary version (v2)

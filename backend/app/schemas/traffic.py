@@ -56,4 +56,6 @@ class TrafficSimulationSummaryResponse(BaseModel):
     stable_summary: SubsystemMetricsSummary
     canary_summary: SubsystemMetricsSummary
     overall_summary: SubsystemMetricsSummary
+    triggered_rollback: bool = Field(False, description="Flag indicating whether automatic rollback was triggered during this batch")
+    rollback_reason: Optional[str] = Field(None, description="Diagnostic root cause message if rollback occurred")
     results: List[SimulatedRequestResult] = []

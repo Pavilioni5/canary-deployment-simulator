@@ -115,113 +115,75 @@ Authorization: Bearer <access_token>
 
 ### `POST /deployments/{id}/simulate`
 - **Summary**: Simulate Client Traffic Across Weighted Router
-- **Description**: Dispatches N client requests through the weighted traffic router and persists metric snapshots.
+- **Description**: Dispatches N client requests through the weighted traffic router, evaluates health thresholds, and triggers automatic rollback if breached.
 - **Status Code**: `200 OK`
 
 ---
 
 ## 6. Metrics & Observability Endpoints (Implemented - Phase 8)
 
-All observability endpoints require authentication (`Authorization: Bearer <token>`).
-
 ### `GET /deployments/{id}/metrics`
 - **Summary**: Get Aggregated Deployment Metrics
-- **Description**: Returns real-time metrics computed across historical simulations: total requests, stable requests, canary requests, overall/canary/stable error rates, average latency, rollback counts, and time-series snapshots for chart rendering.
+- **Description**: Returns cumulative metrics (total requests, stable/canary counts, error rates, average latency, rollback counts, and time-series snapshots).
 - **Status Code**: `200 OK`
+
+### `GET /deployments/{id}/logs`
+- **Summary**: Get Deployment Application Logs
+- **Description**: Inspects structured diagnostic logs with level/source filtering and pagination.
+- **Status Code**: `200 OK`
+
+### `GET /deployments/{id}/history`
+- **Summary**: Get Deployment Audit History
+- **Description**: Returns chronological audit trail of state transitions (`CREATED`, `STARTED`, `TRAFFIC_SHIFT`, `AUTO_ROLLBACK`, `MANUAL_ROLLBACK`).
+- **Status Code**: `200 OK`
+
+---
+
+## 7. Rollback & Circuit Breaker Endpoints (Implemented - Phase 9)
+
+### `POST /deployments/{id}/rollback`
+- **Summary**: Manual Deployment Rollback
+- **Description**: Instantly trips the circuit breaker: resets traffic routing configuration to `100% Stable / 0% Canary`, changes deployment status to `ROLLED_BACK`, appends a `MANUAL_ROLLBACK` audit record to `deployment_events`, and logs a warning.
+- **Security**: Requires Bearer JWT
+- **Status Code**: `200 OK`
+- **Request Body**:
+```json
+{
+  "reason": "Observed elevated latency during peak load."
+}
+```
 - **Response Example**:
 ```json
 {
   "deployment_id": 1,
   "deployment_name": "Checkout Microservice",
-  "status": "RUNNING",
+  "status": "ROLLED_BACK",
+  "rollback_type": "MANUAL",
+  "reason": "Observed elevated latency during peak load.",
   "rollback_threshold": 10.0,
-  "total_requests": 150,
-  "stable_requests": 112,
-  "canary_requests": 38,
-  "total_successful": 147,
-  "total_failed": 3,
-  "overall_error_rate": 2.0,
-  "stable_error_rate": 0.0,
-  "canary_error_rate": 7.89,
-  "average_response_time_ms": 28.45,
-  "rollback_count": 0,
-  "recent_snapshots": [
-    {
-      "id": 1,
-      "deployment_id": 1,
-      "version_type": "TOTAL",
-      "total_requests": 50,
-      "successful_requests": 49,
-      "failed_requests": 1,
-      "error_rate": 2.0,
-      "avg_response_time_ms": 28.1,
-      "timestamp": "2026-10-05T09:40:00.000000Z"
-    }
-  ]
+  "observed_canary_error_rate": null,
+  "traffic_restored": {
+    "stable": 100.0,
+    "canary": 0.0
+  },
+  "timestamp": "2026-10-05T10:15:00.000000Z"
 }
 ```
 
-### `GET /deployments/{id}/logs`
-- **Summary**: Get Deployment Application Logs
-- **Description**: Inspects structured diagnostic logs. Supports optional filtering by `level` (INFO, WARNING, ERROR, CRITICAL) and `source` (ROUTER, SIMULATOR, MONITOR, SYSTEM, AUTH), with pagination.
-- **Query Parameters**:
-  - `level`: e.g. `ERROR`
-  - `source`: e.g. `ROUTER`
-  - `skip`: default `0`
-  - `limit`: default `50`
-- **Status Code**: `200 OK`
-- **Response Example**:
-```json
-[
-  {
-    "id": 10,
-    "deployment_id": 1,
-    "level": "INFO",
-    "source": "ROUTER",
-    "message": "Traffic simulation: 50 requests dispatched across split (Stable: 38, Canary: 12). Overall error rate: 0.0%.",
-    "timestamp": "2026-10-05T09:40:05.000000Z"
-  }
-]
-```
-
-### `GET /deployments/{id}/history`
-- **Summary**: Get Deployment Audit History
-- **Description**: Returns chronological audit trail of state transitions (`CREATED`, `STARTED`, `TRAFFIC_SHIFT`, `FAILURE_INJECTED`, `AUTO_ROLLBACK`, `MANUAL_ROLLBACK`).
-- **Status Code**: `200 OK`
-- **Response Example**:
-```json
-[
-  {
-    "id": 3,
-    "deployment_id": 1,
-    "event_type": "TRAFFIC_SHIFT",
-    "message": "Traffic shifted: Stable 75.0% / Canary 25.0%.",
-    "details": "{\"stable\": 75.0, \"canary\": 25.0}",
-    "timestamp": "2026-10-05T09:35:00.000000Z"
-  },
-  {
-    "id": 2,
-    "deployment_id": 1,
-    "event_type": "STARTED",
-    "message": "Canary rollout lifecycle activated. State transitioned to RUNNING.",
-    "details": "{\"status\": \"RUNNING\"}",
-    "timestamp": "2026-10-05T09:30:15.000000Z"
-  },
-  {
-    "id": 1,
-    "deployment_id": 1,
-    "event_type": "CREATED",
-    "message": "Deployment created with Stable (v1.0.0) and Canary (v2.0.0).",
-    "details": "{\"threshold\": 10.0, \"stable\": \"v1.0.0\", \"canary\": \"v2.0.0\"}",
-    "timestamp": "2026-10-05T09:30:00.000000Z"
-  }
-]
-```
+### Automated Circuit-Breaker Rollback Mechanics (Executed via `/simulate`)
+During client traffic simulation (`POST /deployments/{id}/simulate`):
+1. The health monitor calculates the Canary error rate:
+   $$\text{Canary Error Rate} = \left( \frac{\text{Failed Canary Requests}}{\text{Total Canary Requests}} \right) \times 100\%$$
+2. If `Canary Error Rate > Rollback Threshold`:
+   - System immediately resets traffic: `Stable = 100.0%`, `Canary = 0.0%`.
+   - Deployment status transitions to `ROLLED_BACK`.
+   - An `AUTO_ROLLBACK` event is stored in `deployment_events` detailing the threshold, actual error rate, and incident timestamp.
+   - A `CRITICAL` log is written to `logs` and stdout.
+   - Subsequent simulation calls on this deployment are rejected with `HTTP 400 Bad Request`.
 
 ---
 
-## 7. Planned Endpoints for Subsequent Phases
+## 8. Planned Endpoints for Subsequent Phases
 
-### Automated Circuit Breaker & Controlled Failure Injection (Phases 9 & 10)
-- `POST /deployments/{id}/failure` - Inject synthetic failure rate into canary version (v2)
-- `POST /deployments/{id}/rollback` - Manually trigger rollback to 100% stable
+### Controlled Failure Injection (Phase 10)
+- `POST /deployments/{id}/failure` - Dedicated endpoint to configure artificial failure scenarios for live viva demonstration

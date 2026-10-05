@@ -233,17 +233,33 @@ def simulate_routed_traffic(
     db.add(log_entry)
     db.commit()
 
+    # Check for threshold breach and trigger automatic rollback if exceeded
+    triggered_rollback = False
+    rollback_reason = None
+    if canary_count > 0 and canary_summary.error_rate > deployment.rollback_threshold:
+        from app.services.rollback_service import execute_automatic_rollback
+        triggered_rollback = True
+        rollback_reason = execute_automatic_rollback(
+            db=db,
+            deployment=deployment,
+            canary_error_rate=canary_summary.error_rate,
+            canary_count=canary_count,
+            canary_failed=canary_failed
+        )
+
     return TrafficSimulationSummaryResponse(
         deployment_id=deployment.id,
         deployment_name=deployment.name,
         status=deployment.status,
         traffic_weights={
-            "stable": config.stable_percentage,
-            "canary": config.canary_percentage
+            "stable": 100.0 if triggered_rollback else config.stable_percentage,
+            "canary": 0.0 if triggered_rollback else config.canary_percentage
         },
         total_requests=count,
         stable_summary=stable_summary,
         canary_summary=canary_summary,
         overall_summary=overall_summary,
+        triggered_rollback=triggered_rollback,
+        rollback_reason=rollback_reason,
         results=results
     )

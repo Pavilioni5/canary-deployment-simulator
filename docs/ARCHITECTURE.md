@@ -55,3 +55,28 @@ graph TD
 2. **Database**: PostgreSQL (AWS RDS compatible) for structured deployment logs, audit events, and metrics.
 3. **Traffic Router & Controller**: Weighted routing simulating Application Load Balancer (ALB) target group weight adjustments.
 4. **Monitoring & Alerting**: Metrics collection mimicking AWS CloudWatch Alarms for automated rollback triggering.
+
+---
+
+## Frontend Dashboard Architecture (Phase 11)
+
+The frontend client is implemented with React 18 and Vite, utilizing a Vanilla CSS Design System with zero Tailwind dependencies:
+
+```text
+[App.jsx] (Root State & Polling Manager)
+  |-- [Navbar.jsx] (Brand Badge, Health Ping, Deployment Switcher, JWT Auth)
+  |-- [RollbackBanner.jsx] (Emergency Circuit Breaker Notice & Operator Rollback Trigger)
+  |-- [Tabbed View Container]
+        |-- Tab 1: [TopologyCard.jsx] (AWS ALB Ingress, Weighted Target Groups, Fleet Cards)
+        |-- Tab 2: [TrafficControlCard.jsx] (Slider, Presets, Batch Traffic Dispatcher)
+        |-- Tab 3: [ChaosControlCard.jsx] (Failure Rate Slider, Fault Profile Pickers)
+        |-- Tab 4: [TelemetryPanel.jsx] (KPI Stats, Threshold Monitor, Live Packet Trace Table)
+        |-- Tab 5: [AuditLogsPanel.jsx] (Lifecycle Audit History, System Diagnostic Logs)
+  `-- [CreateDeploymentModal.jsx] (Provisioning Dialog for Canary Rollouts)
+```
+
+### Key Frontend Capabilities
+- **Pure Vanilla CSS System**: Custom design tokens for dark mode, glassmorphism, glowing status chips, and typography (`Inter` & `JetBrains Mono`).
+- **Real-Time Polling Engine**: 3.5-second polling synchronization fetching live metrics, circuit breaker status, and logs.
+- **Circuit Breaker Reactivity**: Instantly alerts the operator with animated red banners when error thresholds are breached and traffic is rolled back.
+

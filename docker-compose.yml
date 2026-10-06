@@ -9,9 +9,9 @@ services:
     container_name: canary_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: canary_user
-      POSTGRES_PASSWORD: canary_password
-      POSTGRES_DB: canary_db
+      POSTGRES_USER: ${POSTGRES_USER:-canary_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-canary_password}
+      POSTGRES_DB: ${POSTGRES_DB:-canary_db}
     ports:
       - "5432:5432"
     volumes:
@@ -21,6 +21,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - canary_net
 
   # ----------------------------------------------------------------------------
   # Backend API Service (FastAPI)
@@ -35,29 +37,49 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://canary_user:canary_password@db:5432/canary_db
-      SECRET_KEY: canary-deployment-simulator-academic-secret-key-p71-2026
+      SECRET_KEY: ${SECRET_KEY:-canary-deployment-simulator-academic-secret-key-p71-2026}
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 60
-      CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - canary_net
 
   # ----------------------------------------------------------------------------
-  # Frontend Dashboard Service (React + Vite)
+  # Frontend Dashboard Service (React + Vite served via Nginx)
   # ----------------------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
     container_name: canary_frontend
     restart: unless-stopped
     ports:
-      - "5173:5173"
-    environment:
-      VITE_API_BASE_URL: http://localhost:8000
+      - "5173:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    networks:
+      - canary_net
 
+# ------------------------------------------------------------------------------
+# Persistent Volumes & Bridge Networks
+# ------------------------------------------------------------------------------
 volumes:
   postgres_data:
+    name: canary_postgres_data
+
+networks:
+  canary_net:
+    name: canary_network
+    driver: bridge

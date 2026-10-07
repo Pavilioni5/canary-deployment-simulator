@@ -215,3 +215,41 @@ curl -X POST "http://localhost:8000/deployments/1/failure" \
    - The weighted routing table updates instantaneously. Subsequent requests route 100% to the stable target group.
 3. **How does this map to AWS infrastructure?**
    - Simulates AWS Route 53 weighted records or ALB target group weights combined with Amazon CloudWatch Alarms triggering an AWS Step Function or Lambda rollback script.
+
+---
+
+## 8. Automated Viva Demonstration Protocol (Phase 13)
+
+To ensure seamless evaluation during academic presentations and live oral examinations, the project includes an automated end-to-end demonstration runner: `backend/scripts/demo_rollback.py`.
+
+### Execution Command
+With the FastAPI backend running:
+
+```bash
+cd backend
+.\venv\Scripts\activate
+python scripts/demo_rollback.py
+```
+
+### Demonstration Stages and Verification Matrix
+
+| Stage | Action Executed | REST API Route | State Transition | Verification Indicator |
+| :--- | :--- | :--- | :--- | :--- |
+| **Stage 1** | System Health & JWT Auth | `GET /health`<br>`POST /auth/login` | Unauthenticated -> Authenticated | Bearer JWT generated; Status `200 OK` |
+| **Stage 2** | Provision Deployment | `POST /deployments`<br>`POST /deployments/{id}/start` | `PENDING` -> `RUNNING` | Deployment record persisted; Threshold set to `10.0%` |
+| **Stage 3** | Pilot Canary Phase | `POST /deployments/{id}/traffic`<br>`POST /deployments/{id}/simulate` | Traffic: `90% Stable / 10% Canary` | 20 client requests dispatched; 0% error rate; Status `RUNNING` |
+| **Stage 4** | Expanded Rollout | `POST /deployments/{id}/traffic`<br>`POST /deployments/{id}/simulate` | Traffic: `50% Stable / 50% Canary` | 20 client requests dispatched; Status remains `RUNNING` |
+| **Stage 5** | Chaos Fault Injection | `POST /deployments/{id}/failure` | `failure_rate = 0.40`<br>`error_type = HTTP_500` | Audit event `FAILURE_INJECTED` logged |
+| **Stage 6** | Automated Circuit Breaker | `POST /deployments/{id}/simulate` | Status: `ROLLED_BACK`<br>Traffic: `100% Stable / 0% Canary` | Monitored error rate > `10.0%`; Immediate traffic restoration |
+| **Stage 7** | Forensic Inspection | `GET /deployments/{id}/history`<br>`GET /deployments/{id}/logs` | Forensic Readout | Complete provenance timeline with `AUTO_ROLLBACK` |
+
+### Interactive Dashboard Demonstration (UI Alternative)
+Examiners can observe the identical experiment live on the React Web Dashboard:
+1. Open `http://localhost:5173`.
+2. Navigate to **Architecture & Topology** to inspect the baseline 100% Stable allocation.
+3. Select **Traffic Shifting & Simulator**, move the slider to 50/50, click **Apply Traffic Shift**, and simulate 20 requests.
+4. Switch to **Chaos & Failure Injection**, select `HTTP 500` or `LATENCY_TIMEOUT`, set the slider to 35%, and click **Inject Fault**.
+5. Return to **Traffic Shifting & Simulator** and click **Simulate 30 Requests**.
+6. Observe the immediate activation of the glowing red **CIRCUIT BREAKER ACTIVATED** alert banner and verify that traffic weights in the visualizer automatically snap back to 100% Stable.
+7. Switch to **Audit Trail & Logs** to review the cryptographic event trail proving automated recovery.
+

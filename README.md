@@ -102,7 +102,9 @@ canary-deployment-simulator/
 |   |   |-- config.py           # Environment variables loader
 |   |   |-- database.py         # Database engine and session factory
 |   |   `-- main.py             # FastAPI entry point and middleware configuration
-|   |-- tests/                  # Pytest automated test suite
+|   |-- scripts/
+|   |   `-- demo_rollback.py    # Automated end-to-end viva rollback demonstration runner
+|   |-- tests/                  # Pytest automated test suite (53 test cases)
 |   |-- Dockerfile              # Backend container build instructions
 |   `-- requirements.txt        # Python dependency manifest
 |
@@ -117,7 +119,9 @@ canary-deployment-simulator/
 |   `-- Dockerfile              # Multi-stage frontend container build
 |
 |-- load-testing/
-|   `-- locustfile.py           # Load testing scenarios for Locust
+|   |-- locustfile.py           # Load testing scenarios for Locust
+|   |-- run_load_test.py        # Headless automated benchmark runner (10, 50, 100 users)
+|   `-- requirements.txt        # Locust dependencies manifest
 |
 |-- docs/
 |   |-- API_DOCUMENTATION.md    # REST API specification with request and response examples

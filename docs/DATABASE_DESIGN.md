@@ -63,6 +63,7 @@ erDiagram
         string image_tag
         float simulated_latency_ms
         float failure_rate
+        string error_type
         boolean is_active
         timestamp created_at
     }
@@ -142,6 +143,7 @@ Specifies instances running under a deployment (`v1.0.0 Stable` vs `v2.0.0 Canar
 - `image_tag` (Varchar(100), Default `'latest'`, Not Null)
 - `simulated_latency_ms` (Float, Default `50.0`, Not Null)
 - `failure_rate` (Float, Default `0.0`, Not Null) - Configurable injected error probability (0.0 to 1.0)
+- `error_type` (Varchar(50), Default `'HTTP_500'`, Nullable) - Synthetic chaos fault profile (`HTTP_500`, `LATENCY_TIMEOUT`, `DATABASE_ERROR`, `MEMORY_SPIKE`)
 - `is_active` (Boolean, Default `TRUE`, Not Null)
 - `created_at` (Timestamp with Timezone, Default UTC)
 
